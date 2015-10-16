@@ -82,6 +82,34 @@ func (m *Main) Run(args ...string) error {
 		opt.Peers = []string{advertiseAddr}
 	}
 
+	// Create a slice of peers with their HTTP address set instead.
+	httpPeers, err := SetPortSlice(opt.Peers, opt.HTTPAddr)
+	if err != nil {
+		return fmt.Errorf("set port slice: %s", err)
+	}
+
+	// if DISCOVERD contains a valid address, perform a deployment by
+	// starting a proxy DNS server and shutting down the old discoverd job
+	var deploy *discoverd.Deployment
+	if url := os.Getenv("DISCOVERD"); url != "" && url != "none" {
+		deploy, err = discoverd.NewDeployment("discoverd")
+		if err != nil {
+			return err
+		}
+		if err := deploy.MarkPerforming(advertiseAddr); err != nil {
+			return err
+		}
+		// TODO: ensure opt.DNSAddr is set when doing a deployment
+		if err := m.openDNSServer(opt.DNSAddr, opt.Recursors, httpPeers); err != nil {
+			return fmt.Errorf("Failed to start DNS server: %s", err)
+		}
+		m.logger.Printf("discoverd listening for DNS on %s", opt.DNSAddr)
+
+		if err := discoverd.NewClientWithURL(url).Shutdown(); err != nil {
+			return err
+		}
+	}
+
 	// Open store if we are not proxying.
 	if err := m.openStore(opt.DataDir, opt.RaftAddr, advertiseAddr, opt.Peers); err != nil {
 		return fmt.Errorf("Failed to open store: %s", err)
@@ -92,15 +120,17 @@ func (m *Main) Run(args ...string) error {
 		fmt.Fprintln(m.Stderr, "advertised address not in peer set, joining as proxy")
 	}
 
-	// Create a slice of peers with their HTTP address set instead.
-	httpPeers, err := SetPortSlice(opt.Peers, opt.HTTPAddr)
-	if err != nil {
-		return fmt.Errorf("set port slice: %s", err)
-	}
-
-	// If we have a DNS address, start a DNS server right away, otherwise
-	// wait for the host network to come up and then start a DNS server.
-	if opt.DNSAddr != "" {
+	// If we already started the DNS server as part of a deployment above,
+	// and we have an initialized store, just switch from the proxy store
+	// to the initialized store.
+	//
+	// Else if we have a DNS address, start a DNS server right away.
+	//
+	// Otherwise wait for the host network to come up and then start a DNS
+	// server.
+	if m.dnsServer != nil && m.store != nil {
+		m.dnsServer.SetStore(m.store)
+	} else if opt.DNSAddr != "" {
 		if err := m.openDNSServer(opt.DNSAddr, opt.Recursors, httpPeers); err != nil {
 			return fmt.Errorf("Failed to start DNS server: %s", err)
 		}
@@ -136,6 +166,14 @@ func (m *Main) Run(args ...string) error {
 
 	if err := m.openHTTPServer(opt.HTTPAddr, opt.Peers); err != nil {
 		return fmt.Errorf("Failed to start HTTP server: %s", err)
+	}
+
+	if deploy != nil {
+		// TODO: only mark as done once we know we have all the state
+		//       from the previous job
+		if err := deploy.MarkDone(advertiseAddr); err != nil {
+			return err
+		}
 	}
 
 	// Notify user that the servers are listening.
@@ -231,9 +269,9 @@ func (m *Main) openDNSServer(addr string, recursors, peers []string) error {
 
 	// If store is available then attach it. Otherwise use a proxy.
 	if m.store != nil {
-		s.Store = m.store
+		s.SetStore(m.store)
 	} else {
-		s.Store = &server.ProxyStore{Peers: peers}
+		s.SetStore(&server.ProxyStore{Peers: peers})
 	}
 
 	if err := s.ListenAndServe(); err != nil {
@@ -261,6 +299,7 @@ func (m *Main) openHTTPServer(addr string, peers []string) error {
 
 	// Otherwise initialize and start handler.
 	h := server.NewHandler()
+	h.Main = m
 	h.Store = m.store
 	go http.Serve(m.httpListener, h)
 

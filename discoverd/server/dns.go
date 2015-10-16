@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/flynn/flynn/Godeps/_workspace/src/github.com/miekg/dns"
@@ -14,25 +15,40 @@ import (
 	"github.com/flynn/flynn/pkg/random"
 )
 
+type DNSStore interface {
+	Instances(service string) ([]*discoverd.Instance, error)
+	ServiceLeader(service string) (*discoverd.Instance, error)
+}
+
 type DNSServer struct {
 	UDPAddr   string
 	TCPAddr   string
 	Domain    string
 	Recursors []string
 
-	Store interface {
-		Instances(service string) ([]*discoverd.Instance, error)
-		ServiceLeader(service string) (*discoverd.Instance, error)
-	}
+	store    DNSStore
+	storeMtx sync.Mutex
 
 	servers []*dns.Server
+}
+
+func (srv *DNSServer) GetStore() DNSStore {
+	srv.storeMtx.Lock()
+	defer srv.storeMtx.Unlock()
+	return srv.store
+}
+
+func (srv *DNSServer) SetStore(s DNSStore) {
+	srv.storeMtx.Lock()
+	defer srv.storeMtx.Unlock()
+	srv.store = s
 }
 
 const maxUDPRecords = 3
 const dnsDomain = "discoverd."
 
 func (srv *DNSServer) ListenAndServe() error {
-	if srv.Store == nil {
+	if srv.GetStore() == nil {
 		panic("missing Store")
 	}
 	if srv.Domain == "" {
@@ -205,7 +221,7 @@ func (d dnsAPI) ServiceLookup(w dns.ResponseWriter, req *dns.Msg) {
 
 	var instances []*discoverd.Instance
 	if !leader {
-		a, err := d.Store.Instances(service)
+		a, err := d.GetStore().Instances(service)
 		if err != nil {
 			log.Println("discoverd: dns: cannot retrieve instances: %s", err)
 			nxdomain()
@@ -221,7 +237,7 @@ func (d dnsAPI) ServiceLookup(w dns.ResponseWriter, req *dns.Msg) {
 		// we're doing a lookup for a single instance
 		var resInst *discoverd.Instance
 		if leader {
-			sl, err := d.Store.ServiceLeader(service)
+			sl, err := d.GetStore().ServiceLeader(service)
 			if err != nil {
 				log.Println("discoverd: dns: cannot retrieve service leader: %s", err)
 				nxdomain()

@@ -50,12 +50,17 @@ func NewHandler() *Handler {
 
 	r.GET("/ping", h.servePing)
 
+	r.GET("/shutdown", h.serveShutdown)
+
 	return h
 }
 
 // Handler represents an HTTP handler for the Store.
 type Handler struct {
 	http.Handler
+	Main interface {
+		Close() error
+	}
 	Store interface {
 		Leader() string
 		AddService(service string, config *discoverd.ServiceConfig) error
@@ -304,6 +309,12 @@ func (h *Handler) serveGetLeader(w http.ResponseWriter, r *http.Request, params 
 
 // servePing returns a 200 OK.
 func (h *Handler) servePing(w http.ResponseWriter, r *http.Request, params httprouter.Params) {}
+
+func (h *Handler) serveShutdown(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	if err := h.Main.Close(); err != nil {
+		hh.Error(w, err)
+	}
+}
 
 // serveStream creates a subscription and streams out events in SSE format.
 func (h *Handler) serveStream(w http.ResponseWriter, params httprouter.Params, kind discoverd.EventKind) {
