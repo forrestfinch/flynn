@@ -28,7 +28,7 @@ func migrateDB(db *postgres.DB) error {
     deleted_at timestamptz
 )`,
 
-		`CREATE TYPE deployment_strategy AS ENUM ('all-at-once', 'one-by-one', 'postgres')`,
+		`CREATE TYPE deployment_strategy AS ENUM ('all-at-once', 'one-by-one', 'postgres', 'discoverd-meta')`,
 
 		`CREATE TABLE apps (
     app_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
