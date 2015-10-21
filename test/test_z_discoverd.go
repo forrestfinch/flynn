@@ -21,8 +21,6 @@ func (s *ZDiscoverdSuite) TestDeploy(t *c.C) {
 	release, err := client.GetAppRelease(app.ID)
 	t.Assert(err, c.IsNil)
 	release.ID = ""
-	// TODO: make the host override DISCOVERD=none set during bootstrap
-	delete(release.Env, "DISCOVERD")
 	t.Assert(client.CreateRelease(release), c.IsNil)
 	deployment, err := client.CreateDeployment(app.ID, release.ID)
 	t.Assert(err, c.IsNil)
