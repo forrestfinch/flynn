@@ -85,7 +85,7 @@ func (srv *DNSServer) ListenAndServe() error {
 	}
 
 	if srv.TCPAddr != "" {
-		l, err := net.Listen("tcp", srv.TCPAddr)
+		l, err := reuseport.NewReusablePortListener("tcp4", srv.TCPAddr)
 		if err != nil {
 			return err
 		}

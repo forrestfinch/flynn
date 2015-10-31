@@ -100,11 +100,13 @@ func (m *Main) Run(args ...string) error {
 		if err := deploy.MarkPerforming(advertiseAddr); err != nil {
 			return err
 		}
-		// TODO: ensure opt.DNSAddr is set when doing a deployment
-		if err := m.openDNSServer(opt.DNSAddr, opt.Recursors, httpPeers); err != nil {
+		// TODO(jpg): Do we need to handle opt.DNSAddr/opt.Recursors here?
+		addr, resolvers := waitHostDNSConfig()
+		m.logger.Println("starting proxy dns server")
+		if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
 			return fmt.Errorf("Failed to start DNS server: %s", err)
 		}
-		m.logger.Printf("discoverd listening for DNS on %s", opt.DNSAddr)
+		m.logger.Printf("discoverd listening for DNS on %s", addr)
 
 		if err := discoverd.NewClientWithURL(url).Shutdown(); err != nil {
 			return err
@@ -138,22 +140,8 @@ func (m *Main) Run(args ...string) error {
 		m.logger.Printf("discoverd listening for DNS on %s", opt.DNSAddr)
 	} else if opt.WaitNetDNS {
 		go func() {
-			// Wait for the host network.
-			status, err := cluster.WaitForHostStatus(os.Getenv("EXTERNAL_IP"), func(status *host.HostStatus) bool {
-				return status.Network != nil && status.Network.Subnet != ""
-			})
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// Parse network subnet to determine bind address.
-			ip, _, err := net.ParseCIDR(status.Network.Subnet)
-			if err != nil {
-				log.Fatal(err)
-			}
-			addr := net.JoinHostPort(ip.String(), "53")
-
-			if err := m.openDNSServer(addr, status.Network.Resolvers, httpPeers); err != nil {
+			addr, resolvers := waitHostDNSConfig()
+			if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
 				log.Fatalf("Failed to start DNS server: %s", err)
 			}
 			m.logger.Printf("discoverd listening for DNS on %s", addr)
@@ -197,6 +185,24 @@ func (m *Main) Run(args ...string) error {
 	go discoverd.NewClientWithURL("http://"+httpAddr).AddServiceAndRegister("discoverd", httpAddr)
 
 	return nil
+}
+
+func waitHostDNSConfig() (addr string, resolvers []string) {
+	// Wait for the host network.
+	status, err := cluster.WaitForHostStatus(os.Getenv("EXTERNAL_IP"), func(status *host.HostStatus) bool {
+		return status.Network != nil && status.Network.Subnet != ""
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Parse network subnet to determine bind address.
+	ip, _, err := net.ParseCIDR(status.Network.Subnet)
+	if err != nil {
+		log.Fatal(err)
+	}
+	addr = net.JoinHostPort(ip.String(), "53")
+	return addr, status.Network.Resolvers
 }
 
 // Close shuts down all open servers.
