@@ -204,10 +204,12 @@ func (s *Store) Close() error {
 	// Notify goroutines of closing and wait until they finish.
 	close(s.closing)
 	s.wg.Wait()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for _, l := range s.subscribers {
 		for el := l.Front(); el != nil; el = el.Next() {
-			el.Value.(*subscription).Close()
+			go el.Value.(*subscription).Close()
 		}
 	}
 	if s.raft != nil {
