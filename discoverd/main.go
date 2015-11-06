@@ -89,27 +89,32 @@ func (m *Main) Run(args ...string) error {
 		return fmt.Errorf("set port slice: %s", err)
 	}
 
-	// if DISCOVERD contains a valid address, perform a deployment by
+	// if DISCOVERD contains a valid address, check if there is an instance
+	// running at this address, if so then perform a deployment by
 	// starting a proxy DNS server and shutting down the old discoverd job
 	var deploy *discoverd.Deployment
 	if url := os.Getenv("DISCOVERD"); url != "" && url != "none" {
-		deploy, err = discoverd.NewDeployment("discoverd")
-		if err != nil {
-			return err
-		}
-		if err := deploy.MarkPerforming(advertiseAddr); err != nil {
-			return err
-		}
-		// TODO(jpg): Do we need to handle opt.DNSAddr/opt.Recursors here?
-		addr, resolvers := waitHostDNSConfig()
-		m.logger.Println("starting proxy dns server")
-		if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
-			return fmt.Errorf("Failed to start DNS server: %s", err)
-		}
-		m.logger.Printf("discoverd listening for DNS on %s", addr)
+		if err := discoverd.NewClientWithURL(url).Ping(); err == nil {
+			deploy, err = discoverd.NewDeployment("discoverd")
+			if err != nil {
+				return err
+			}
+			if err := deploy.MarkPerforming(advertiseAddr); err != nil {
+				return err
+			}
+			// TODO(jpg): Do we need to handle opt.DNSAddr/opt.Recursors here?
+			addr, resolvers := waitHostDNSConfig()
+			m.logger.Println("starting proxy dns server")
+			if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
+				return fmt.Errorf("Failed to start DNS server: %s", err)
+			}
+			m.logger.Printf("discoverd listening for DNS on %s", addr)
 
-		if err := discoverd.NewClientWithURL(url).Shutdown(); err != nil {
-			return err
+			if err := discoverd.NewClientWithURL(url).Shutdown(); err != nil {
+				return err
+			}
+		} else {
+			m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
 		}
 	}
 
