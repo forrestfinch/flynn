@@ -102,8 +102,13 @@ func (m *Main) Run(args ...string) error {
 			if err := deploy.MarkPerforming(advertiseAddr); err != nil {
 				return err
 			}
-			// TODO(jpg): Do we need to handle opt.DNSAddr/opt.Recursors here?
 			addr, resolvers := waitHostDNSConfig()
+			if opt.DNSAddr != "" {
+				addr = opt.DNSAddr
+			}
+			if len(opt.Recursors) > 0 {
+				resolvers = opt.Recursors
+			}
 			m.logger.Println("starting proxy dns server")
 			if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
 				return fmt.Errorf("Failed to start DNS server: %s", err)
