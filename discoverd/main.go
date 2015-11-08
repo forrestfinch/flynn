@@ -95,7 +95,7 @@ func (m *Main) Run(args ...string) error {
 	var deploy *discoverd.Deployment
 	target := fmt.Sprintf("http://%s:1111", opt.Host)
 	m.logger.Println("Trying to connect to:", target)
-	tgt_client := discoverd.NewClientWithURL(target)
+	tgt_client := discoverd.NewClientWithHTTP(target, &http.Client{})
 	if err := tgt_client.Ping(); err == nil {
 		m.logger.Println("Server responding at", target, "taking over")
 		os.Setenv("DISCOVERD", target) // set so that the default client works
