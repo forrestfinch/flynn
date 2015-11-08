@@ -93,34 +93,40 @@ func (m *Main) Run(args ...string) error {
 	// running at this address, if so then perform a deployment by
 	// starting a proxy DNS server and shutting down the old discoverd job
 	var deploy *discoverd.Deployment
-	if url := os.Getenv("DISCOVERD"); url != "" && url != "none" {
-		if err := discoverd.NewClientWithURL(url).Ping(); err == nil {
-			deploy, err = discoverd.NewDeployment("discoverd")
-			if err != nil {
-				return err
-			}
-			if err := deploy.MarkPerforming(advertiseAddr); err != nil {
-				return err
-			}
-			addr, resolvers := waitHostDNSConfig()
-			if opt.DNSAddr != "" {
-				addr = opt.DNSAddr
-			}
-			if len(opt.Recursors) > 0 {
-				resolvers = opt.Recursors
-			}
-			m.logger.Println("starting proxy dns server")
-			if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
-				return fmt.Errorf("Failed to start DNS server: %s", err)
-			}
-			m.logger.Printf("discoverd listening for DNS on %s", addr)
-
-			if err := discoverd.NewClientWithURL(url).Shutdown(); err != nil {
-				return err
-			}
-		} else {
-			m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
+	target := fmt.Sprintf("http://%s:1111", opt.Host)
+	m.logger.Println("Trying to connect to:", target)
+	tgt_client := discoverd.NewClientWithURL(target)
+	if err := tgt_client.Ping(); err == nil {
+		m.logger.Println("Server responding at", target, "taking over")
+		os.Setenv("DISCOVERD", target) // set so that the default client works
+		discoverd.DefaultClient = discoverd.NewClient()
+		deploy, err = discoverd.NewDeployment("discoverd")
+		if err != nil {
+			return err
 		}
+		m.logger.Println("Created deployment")
+		if err := deploy.MarkPerforming(advertiseAddr); err != nil {
+			return err
+		}
+		m.logger.Println("Marked", advertiseAddr, "as performing")
+		addr, resolvers := waitHostDNSConfig()
+		if opt.DNSAddr != "" {
+			addr = opt.DNSAddr
+		}
+		if len(opt.Recursors) > 0 {
+			resolvers = opt.Recursors
+		}
+		m.logger.Println("starting proxy dns server")
+		if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
+			return fmt.Errorf("Failed to start DNS server: %s", err)
+		}
+		m.logger.Printf("discoverd listening for DNS on %s", addr)
+
+		if err := discoverd.NewClientWithURL(target).Shutdown(); err != nil {
+			return err
+		}
+	} else {
+		m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
 	}
 
 	// Open store if we are not proxying.
