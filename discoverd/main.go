@@ -125,6 +125,8 @@ func (m *Main) Run(args ...string) error {
 		if err := discoverd.NewClientWithURL(target).Shutdown(); err != nil {
 			return err
 		}
+		//FIXME
+		time.Sleep(5 * time.Second)
 	} else {
 		m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
 	}
