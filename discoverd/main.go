@@ -222,7 +222,7 @@ func waitHostDNSConfig() (addr string, resolvers []string) {
 }
 
 // Close shuts down all open servers.
-func (m *Main) Close() error {
+func (m *Main) Close() (last_idx uint64, err error) {
 	if m.httpServer != nil {
 		// Disable keep alives so that persistent connections will close
 		m.httpServer.SetKeepAlivesEnabled(false)
@@ -236,10 +236,10 @@ func (m *Main) Close() error {
 		m.dnsServer = nil
 	}
 	if m.store != nil {
-		m.store.Close()
+		last_idx, err = m.store.Close()
 		m.store = nil
 	}
-	return nil
+	return last_idx, err
 }
 
 // openStore initializes and opens the store.

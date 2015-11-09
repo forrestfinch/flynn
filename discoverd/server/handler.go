@@ -59,7 +59,7 @@ func NewHandler() *Handler {
 type Handler struct {
 	http.Handler
 	Main interface {
-		Close() error
+		Close() (uint64, error)
 	}
 	Store interface {
 		Leader() string
@@ -311,9 +311,12 @@ func (h *Handler) serveGetLeader(w http.ResponseWriter, r *http.Request, params 
 func (h *Handler) servePing(w http.ResponseWriter, r *http.Request, params httprouter.Params) {}
 
 func (h *Handler) serveShutdown(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	if err := h.Main.Close(); err != nil {
+	last_idx, err := h.Main.Close()
+	if err != nil {
 		hh.Error(w, err)
+		return
 	}
+	hh.JSON(w, 200, last_idx)
 }
 
 // serveStream creates a subscription and streams out events in SSE format.
