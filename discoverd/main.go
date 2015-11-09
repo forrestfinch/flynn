@@ -93,6 +93,8 @@ func (m *Main) Run(args ...string) error {
 	// running at this address, if so then perform a deployment by
 	// starting a proxy DNS server and shutting down the old discoverd job
 	var deploy *discoverd.Deployment
+	var last_idx uint64
+	last_idx = 0
 	target := fmt.Sprintf("http://%s:1111", opt.Host)
 	m.logger.Println("Trying to connect to:", target)
 	tgt_client := discoverd.NewClientWithHTTP(target, &http.Client{})
@@ -122,7 +124,8 @@ func (m *Main) Run(args ...string) error {
 		}
 		m.logger.Printf("discoverd listening for DNS on %s", addr)
 
-		if err := discoverd.NewClientWithURL(target).Shutdown(); err != nil {
+		last_idx, err = discoverd.NewClientWithURL(target).Shutdown()
+		if err != nil {
 			return err
 		}
 		//FIXME
@@ -171,13 +174,18 @@ func (m *Main) Run(args ...string) error {
 		}()
 	}
 
+	if last_idx > 0 {
+		for m.store.LastIndex() < last_idx {
+			m.logger.Println("Waiting for store to catchup, current:", m.store.LastIndex(), "target:", last_idx)
+			time.Sleep(time.Second)
+		}
+	}
+
 	if err := m.openHTTPServer(opt.HTTPAddr, opt.Peers); err != nil {
 		return fmt.Errorf("Failed to start HTTP server: %s", err)
 	}
 
 	if deploy != nil {
-		// TODO: only mark as done once we know we have all the state
-		//       from the previous job
 		if err := deploy.MarkDone(advertiseAddr); err != nil {
 			return err
 		}

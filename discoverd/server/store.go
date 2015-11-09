@@ -199,6 +199,15 @@ func (s *Store) Open() error {
 	return nil
 }
 
+func (s *Store) LastIndex() uint64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.raft != nil {
+		return s.raft.LastIndex()
+	}
+	return 0
+}
+
 // Close shuts down the transport and store.
 func (s *Store) Close() (last_idx uint64, err error) {
 	// Notify goroutines of closing and wait until they finish.

@@ -165,8 +165,9 @@ outer:
 	}
 }
 
-func (c *Client) Shutdown() error {
-	return c.c.Get("/shutdown", nil)
+func (c *Client) Shutdown() (uint64, error) {
+	var res uint64
+	return res, c.c.Get("/shutdown", &res)
 }
 
 type service struct {
