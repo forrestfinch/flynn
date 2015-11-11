@@ -18,27 +18,29 @@ func (d *DeployJob) deployDiscoverdMeta() (err error) {
 		}
 	}()
 
-	discDeploy, err := discoverd.NewDeployment(d.serviceName)
-	if err != nil {
-		return err
-	}
+	discDeploys := make(map[string]*discoverd.Deployment)
 
-	if err := discDeploy.Reset(); err != nil {
-		return err
+	for typ, serviceName := range d.serviceNames {
+		discDeploy, err := discoverd.NewDeployment(serviceName)
+		if err != nil {
+			return err
+		}
+		discDeploys[typ] = discDeploy
+		if err := discDeploy.Reset(); err != nil {
+			return err
+		}
+		defer discDeploy.Close()
 	}
-	defer discDeploy.Close()
 
 	return d.deployOneByOneWithWaitFn(func(releaseID string, expected jobEvents, log log15.Logger) error {
-		// call discoverd.Deployment.Wait if we are waiting for up
-		// events, otherwise just wait for job down events.
-		//
-		// TODO: change the WaitFn signature to be more explicit about
-		//       whether we are waiting for up or down events (the
-		//       process type may well not be called "app").
-		if count, ok := expected["app"]["up"]; ok && count > 0 {
-			return discDeploy.Wait(count, log)
-		} else {
-			return d.waitForJobEvents(releaseID, expected, log)
+		// TODO(jpg): Properly handle more than 1 process
+		for typ, events := range expected {
+			if count, ok := events["up"]; ok && count > 0 {
+				if discDeploy, ok := discDeploys[typ]; ok {
+					return discDeploy.Wait(count, log)
+				}
+			}
 		}
+		return d.waitForJobEvents(releaseID, expected, log)
 	})
 }

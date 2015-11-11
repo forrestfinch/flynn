@@ -21,7 +21,7 @@ type DeployJob struct {
 	client          *controller.Client
 	deployEvents    chan<- ct.DeploymentEvent
 	jobEvents       chan *ct.Job
-	serviceName     string
+	serviceNames    map[string]string
 	serviceEvents   chan *discoverd.Event
 	serviceMeta     *discoverd.ServiceMeta
 	useJobEvents    map[string]struct{}
@@ -83,8 +83,7 @@ func (d *DeployJob) Perform() error {
 			continue
 		}
 
-		// TODO(lmars): support releases with more than one service
-		d.serviceName = proc.Service
+		d.serviceNames[typ] = proc.Service
 
 		log.Info(fmt.Sprintf("using service discovery for %s process type", typ), "service", proc.Service)
 		events := make(chan *discoverd.Event)
