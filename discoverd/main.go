@@ -144,6 +144,14 @@ func (m *Main) Run(args ...string) error {
 		fmt.Fprintln(m.Stderr, "advertised address not in peer set, joining as proxy")
 	}
 
+	// Wait for the store to catchup before switching to local store if we are doing a deployment
+	if m.store != nil && last_idx > 0 {
+		for m.store.LastIndex() < last_idx {
+			m.logger.Println("Waiting for store to catchup, current:", m.store.LastIndex(), "target:", last_idx)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
 	// If we already started the DNS server as part of a deployment above,
 	// and we have an initialized store, just switch from the proxy store
 	// to the initialized store.
@@ -172,13 +180,6 @@ func (m *Main) Run(args ...string) error {
 				m.Notify(opt.Notify, "", addr)
 			}
 		}()
-	}
-
-	if last_idx > 0 {
-		for m.store.LastIndex() < last_idx {
-			m.logger.Println("Waiting for store to catchup, current:", m.store.LastIndex(), "target:", last_idx)
-			time.Sleep(100 * time.Millisecond)
-		}
 	}
 
 	if err := m.openHTTPServer(opt.HTTPAddr, opt.Peers); err != nil {
