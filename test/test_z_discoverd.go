@@ -37,9 +37,12 @@ loop:
 			if !ok {
 				t.Fatal("unexpected close of deployment event stream")
 			}
-			if event.Status == "complete" || event.Status == "failed" {
+			if event.Status == "complete" {
 				debugf(t, "got deployment event: %s", event.Status)
 				break loop
+			}
+			if event.Status == "failed" {
+				t.Fatal("the deployment failed")
 			}
 			debugf(t, "got deployment event: %s %s", event.JobType, event.JobState)
 		case <-time.After(2 * time.Minute):
