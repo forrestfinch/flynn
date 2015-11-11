@@ -129,7 +129,7 @@ func (m *Main) Run(args ...string) error {
 			return err
 		}
 		//FIXME
-		time.Sleep(5 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 	} else {
 		m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
 	}
@@ -177,7 +177,7 @@ func (m *Main) Run(args ...string) error {
 	if last_idx > 0 {
 		for m.store.LastIndex() < last_idx {
 			m.logger.Println("Waiting for store to catchup, current:", m.store.LastIndex(), "target:", last_idx)
-			time.Sleep(time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 
