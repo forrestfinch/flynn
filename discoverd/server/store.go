@@ -833,10 +833,11 @@ func (s *Store) applyExpireInstancesCommand(cmd []byte) error {
 // raftApply joins typ and cmd and applies it to raft.
 // This call blocks until the apply completes and returns the error.
 func (s *Store) raftApply(typ byte, cmd []byte) (uint64, error) {
-	// TODO: thread safe
+	s.mu.RLock()
 	if s.raft == nil {
 		return 0, ErrShutdown
 	}
+	s.mu.RUnlock()
 
 	// Join the command type and data into one message.
 	buf := append([]byte{typ}, cmd...)
