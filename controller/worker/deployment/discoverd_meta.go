@@ -33,11 +33,15 @@ func (d *DeployJob) deployDiscoverdMeta() (err error) {
 	}
 
 	return d.deployOneByOneWithWaitFn(func(releaseID string, expected jobEvents, log log15.Logger) error {
-		// TODO(jpg): Properly handle more than 1 process
 		for typ, events := range expected {
 			if count, ok := events["up"]; ok && count > 0 {
 				if discDeploy, ok := discDeploys[typ]; ok {
-					return discDeploy.Wait(count, log)
+					if err := discDeploy.Wait(count, log); err != nil {
+						return err
+					}
+					// clear up events for this type so we can safely
+					// process job down events if needed
+					expected[typ]["up"] = 0
 				}
 			}
 		}
