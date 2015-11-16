@@ -113,6 +113,39 @@ func scanFormation(s postgres.Scanner) (*ct.Formation, error) {
 	return f, err
 }
 
+func scanExpandedFormation(s postgres.Scanner) (*ct.ExpandedFormation, error) {
+	f := &ct.ExpandedFormation{
+		App:      &ct.App{},
+		Release:  &ct.Release{},
+		Artifact: &ct.Artifact{},
+	}
+	var artifactID *string
+	err := s.Scan(
+		&f.App.ID,
+		&f.App.Name,
+		&f.Release.ID,
+		&artifactID,
+		&f.Release.Meta,
+		&f.Release.Env,
+		&f.Release.Processes,
+		&f.Artifact.ID,
+		&f.Artifact.Type,
+		&f.Artifact.URI,
+		&f.Processes,
+		&f.UpdatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			err = ErrNotFound
+		}
+		return nil, err
+	}
+	if artifactID != nil {
+		f.Release.ArtifactID = *artifactID
+	}
+	return f, nil
+}
+
 func (r *FormationRepo) Get(appID, releaseID string) (*ct.Formation, error) {
 	row := r.db.QueryRow("formation_select", appID, releaseID)
 	return scanFormation(row)
@@ -126,6 +159,23 @@ func (r *FormationRepo) List(appID string) ([]*ct.Formation, error) {
 	formations := []*ct.Formation{}
 	for rows.Next() {
 		formation, err := scanFormation(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		formations = append(formations, formation)
+	}
+	return formations, nil
+}
+
+func (r *FormationRepo) ListActive() ([]*ct.ExpandedFormation, error) {
+	rows, err := r.db.Query("formation_list_active")
+	if err != nil {
+		return nil, err
+	}
+	formations := []*ct.ExpandedFormation{}
+	for rows.Next() {
+		formation, err := scanExpandedFormation(rows)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -378,6 +428,15 @@ func (c *controllerAPI) DeleteFormation(ctx context.Context, w http.ResponseWrit
 func (c *controllerAPI) ListFormations(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	app := c.getApp(ctx)
 	list, err := c.formationRepo.List(app.ID)
+	if err != nil {
+		respondWithError(w, err)
+		return
+	}
+	httphelper.JSON(w, 200, list)
+}
+
+func (c *controllerAPI) ListActiveFormations(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	list, err := c.formationRepo.ListActive()
 	if err != nil {
 		respondWithError(w, err)
 		return
