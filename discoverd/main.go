@@ -89,19 +89,22 @@ func (m *Main) Run(args ...string) error {
 		return fmt.Errorf("set port slice: %s", err)
 	}
 
-	// if DISCOVERD contains a valid address, check if there is an instance
-	// running at this address, if so then perform a deployment by
-	// starting a proxy DNS server and shutting down the old discoverd job
+	// if there is a discoverd process already running on this
+	// address perform a deployment by starting a proxy DNS server
+	// and shutting down the old discoverd job
 	var deploy *discoverd.Deployment
 	var last_idx uint64
-	last_idx = 0
+
 	target := fmt.Sprintf("http://%s:1111", opt.Host)
 	m.logger.Println("Trying to connect to:", target)
-	tgt_client := discoverd.NewClientWithHTTP(target, &http.Client{})
-	if err := tgt_client.Ping(); err == nil {
+	if err := discoverd.NewClientWithHTTP(target, &http.Client{}).Ping(); err == nil {
 		m.logger.Println("Server responding at", target, "taking over")
-		os.Setenv("DISCOVERD", target) // set so that the default client works
+
+		// update DISCOVERD environment variable so that the default
+		// discoverd client connects to the instance we intend to replace.
+		os.Setenv("DISCOVERD", target)
 		discoverd.DefaultClient = discoverd.NewClient()
+
 		deploy, err = discoverd.NewDeployment("discoverd")
 		if err != nil {
 			return err
@@ -118,7 +121,7 @@ func (m *Main) Run(args ...string) error {
 		if len(opt.Recursors) > 0 {
 			resolvers = opt.Recursors
 		}
-		m.logger.Println("starting proxy dns server")
+		m.logger.Println("Starting proxy DNS server")
 		if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
 			return fmt.Errorf("Failed to start DNS server: %s", err)
 		}
@@ -128,7 +131,8 @@ func (m *Main) Run(args ...string) error {
 		if err != nil {
 			return err
 		}
-		//FIXME
+		//FIXME(jpg): There is a race with shutting down the old listener and
+		// binding the new raft listener here, despite usage of SO_REUSEADDR
 		time.Sleep(300 * time.Millisecond)
 	} else {
 		m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
