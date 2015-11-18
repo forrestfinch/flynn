@@ -28,7 +28,7 @@ func migrateDB(db *postgres.DB) error {
     deleted_at timestamptz
 )`,
 
-		`CREATE TYPE deployment_strategy AS ENUM ('all-at-once', 'one-by-one', 'postgres', 'discoverd-meta')`,
+		`CREATE TYPE deployment_strategy AS ENUM ('all-at-once', 'one-by-one', 'postgres')`,
 
 		`CREATE TABLE apps (
     app_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -206,6 +206,9 @@ $$ LANGUAGE plpgsql`,
 		`ALTER TABLE events ALTER COLUMN object_type TYPE text`,
 		`ALTER TABLE events ADD CONSTRAINT events_object_type_fkey FOREIGN KEY (object_type) REFERENCES event_types (name)`,
 		`DROP TYPE event_type`,
+	)
+	m.Add(5,
+		`INSERT INTO deployment_strategies (name) VALUES ('discoverd-meta')`,
 	)
 	return m.Migrate(db)
 }
