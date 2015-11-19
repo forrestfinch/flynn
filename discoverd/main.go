@@ -131,9 +131,6 @@ func (m *Main) Run(args ...string) error {
 		if err != nil {
 			return err
 		}
-		//FIXME(jpg): There is a race with shutting down the old listener and
-		// binding the new raft listener here, despite usage of SO_REUSEADDR
-		time.Sleep(300 * time.Millisecond)
 	} else {
 		m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
 	}
