@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/flynn/flynn/discoverd/client"
+	dd "github.com/flynn/flynn/discoverd/deployment"
 	"github.com/flynn/flynn/discoverd/server"
 	"github.com/flynn/flynn/host/types"
 	"github.com/flynn/flynn/pkg/cluster"
@@ -92,7 +93,7 @@ func (m *Main) Run(args ...string) error {
 	// if there is a discoverd process already running on this
 	// address perform a deployment by starting a proxy DNS server
 	// and shutting down the old discoverd job
-	var deploy *discoverd.Deployment
+	var deploy *dd.Deployment
 	var last_idx uint64
 
 	target := fmt.Sprintf("http://%s:1111", opt.Host)
@@ -105,7 +106,7 @@ func (m *Main) Run(args ...string) error {
 		os.Setenv("DISCOVERD", target)
 		discoverd.DefaultClient = discoverd.NewClient()
 
-		deploy, err = discoverd.NewDeployment("discoverd")
+		deploy, err = dd.NewDeployment("discoverd")
 		if err != nil {
 			return err
 		}

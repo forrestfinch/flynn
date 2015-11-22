@@ -1,4 +1,4 @@
-package discoverd
+package deployment
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/flynn/flynn/Godeps/_workspace/src/gopkg.in/inconshreveable/log15.v2"
+	"github.com/flynn/flynn/discoverd/client"
 	"github.com/flynn/flynn/pkg/attempt"
 	"github.com/flynn/flynn/pkg/stream"
 )
@@ -18,8 +19,8 @@ const (
 )
 
 func NewDeployment(service string) (*Deployment, error) {
-	s := NewService(service)
-	events := make(chan *Event)
+	s := discoverd.NewService(service)
+	events := make(chan *discoverd.Event)
 	stream, err := s.Watch(events)
 	if err != nil {
 		return nil, err
@@ -30,8 +31,8 @@ func NewDeployment(service string) (*Deployment, error) {
 // Deployment is a wrapper around service metadata for marking jobs as either
 // performing a deployment or done deploying
 type Deployment struct {
-	service Service
-	events  chan *Event
+	service discoverd.Service
+	events  chan *discoverd.Event
 	stream  stream.Stream
 }
 
@@ -76,7 +77,7 @@ outer:
 					if !ok {
 						return fmt.Errorf("service stream closed unexpectedly: %s", d.stream.Err())
 					}
-					if event.Kind == EventKindServiceMeta {
+					if event.Kind == discoverd.EventKindServiceMeta {
 						continue outer
 					}
 				case <-time.After(deploymentTimeout):
@@ -134,7 +135,7 @@ func (d *Deployment) Wait(expected int, log log15.Logger) error {
 			if !ok {
 				return fmt.Errorf("service stream closed unexpectedly: %s", d.stream.Err())
 			}
-			if event.Kind == EventKindServiceMeta {
+			if event.Kind == discoverd.EventKindServiceMeta {
 				states, err := d.decode(event.ServiceMeta)
 				if err != nil {
 					return err
@@ -159,7 +160,7 @@ func (d *Deployment) Wait(expected int, log log15.Logger) error {
 // Reset sets the service metadata to null
 func (d *Deployment) Reset() error {
 	return attempts.Run(func() error {
-		if err := d.set(&ServiceMeta{}, nil); err == nil {
+		if err := d.set(&discoverd.ServiceMeta{}, nil); err == nil {
 			return nil
 		}
 		meta, err := d.service.GetMeta()
@@ -174,7 +175,7 @@ func (d *Deployment) Close() error {
 	return d.stream.Close()
 }
 
-func (d *Deployment) decode(meta *ServiceMeta) (map[string]DeploymentState, error) {
+func (d *Deployment) decode(meta *discoverd.ServiceMeta) (map[string]DeploymentState, error) {
 	var states map[string]DeploymentState
 	if err := json.Unmarshal(meta.Data, &states); err != nil {
 		return nil, err
@@ -185,7 +186,7 @@ func (d *Deployment) decode(meta *ServiceMeta) (map[string]DeploymentState, erro
 	return states, nil
 }
 
-func (d *Deployment) set(meta *ServiceMeta, states map[string]DeploymentState) error {
+func (d *Deployment) set(meta *discoverd.ServiceMeta, states map[string]DeploymentState) error {
 	data, err := json.Marshal(states)
 	if err != nil {
 		return err

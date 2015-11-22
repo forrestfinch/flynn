@@ -2,7 +2,7 @@ package deployment
 
 import (
 	"github.com/flynn/flynn/Godeps/_workspace/src/gopkg.in/inconshreveable/log15.v2"
-	"github.com/flynn/flynn/discoverd/client"
+	dd "github.com/flynn/flynn/discoverd/deployment"
 )
 
 // deployDiscoverMeta does a one-by-one deployment but uses discoverd.Deployment
@@ -18,10 +18,10 @@ func (d *DeployJob) deployDiscoverdMeta() (err error) {
 		}
 	}()
 
-	discDeploys := make(map[string]*discoverd.Deployment)
+	discDeploys := make(map[string]*dd.Deployment)
 
 	for typ, serviceName := range d.serviceNames {
-		discDeploy, err := discoverd.NewDeployment(serviceName)
+		discDeploy, err := dd.NewDeployment(serviceName)
 		if err != nil {
 			return err
 		}
