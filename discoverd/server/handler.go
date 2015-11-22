@@ -50,7 +50,7 @@ func NewHandler() *Handler {
 
 	r.GET("/ping", h.servePing)
 
-	r.GET("/shutdown", h.serveShutdown)
+	r.POST("/shutdown", h.serveShutdown)
 
 	return h
 }
@@ -311,12 +311,12 @@ func (h *Handler) serveGetLeader(w http.ResponseWriter, r *http.Request, params 
 func (h *Handler) servePing(w http.ResponseWriter, r *http.Request, params httprouter.Params) {}
 
 func (h *Handler) serveShutdown(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	last_idx, err := h.Main.Close()
+	lastIdx, err := h.Main.Close()
 	if err != nil {
 		hh.Error(w, err)
 		return
 	}
-	hh.JSON(w, 200, last_idx)
+	hh.JSON(w, 200, lastIdx)
 }
 
 // serveStream creates a subscription and streams out events in SSE format.

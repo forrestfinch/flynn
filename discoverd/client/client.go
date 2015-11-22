@@ -167,7 +167,7 @@ outer:
 
 func (c *Client) Shutdown() (uint64, error) {
 	var res uint64
-	return res, c.c.Get("/shutdown", &res)
+	return res, c.c.Post("/shutdown", nil, &res)
 }
 
 type service struct {
