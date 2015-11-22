@@ -6,7 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/flynn/flynn/Godeps/_workspace/src/github.com/miekg/dns"
@@ -26,22 +26,16 @@ type DNSServer struct {
 	Domain    string
 	Recursors []string
 
-	store    DNSStore
-	storeMtx sync.Mutex
-
+	store   atomic.Value // *DNSStore
 	servers []*dns.Server
 }
 
 func (srv *DNSServer) GetStore() DNSStore {
-	srv.storeMtx.Lock()
-	defer srv.storeMtx.Unlock()
-	return srv.store
+	return *srv.store.Load().(*DNSStore)
 }
 
 func (srv *DNSServer) SetStore(s DNSStore) {
-	srv.storeMtx.Lock()
-	defer srv.storeMtx.Unlock()
-	srv.store = s
+	srv.store.Store(&s)
 }
 
 const maxUDPRecords = 3
