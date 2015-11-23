@@ -98,7 +98,7 @@ func BootDiscoverd(t TestingT, raftPort, httpPort string) (*discoverd.Client, fu
 	addr, killDiscoverd := RunDiscoverdServer(t, raftPort, httpPort)
 
 	client := discoverd.NewClientWithURL("http://" + addr)
-	if err := Attempts.Run(client.Ping); err != nil {
+	if err := Attempts.Run(func() error { return client.Ping("http://" + addr) }); err != nil {
 		t.Fatal("Failed to connect to discoverd: ", err)
 	}
 	return client, killDiscoverd
