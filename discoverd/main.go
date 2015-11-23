@@ -18,6 +18,7 @@ import (
 	"github.com/flynn/flynn/discoverd/client"
 	dd "github.com/flynn/flynn/discoverd/deployment"
 	"github.com/flynn/flynn/discoverd/server"
+	dt "github.com/flynn/flynn/discoverd/types"
 	"github.com/flynn/flynn/host/types"
 	"github.com/flynn/flynn/pkg/cluster"
 	"github.com/flynn/flynn/pkg/shutdown"
@@ -94,7 +95,7 @@ func (m *Main) Run(args ...string) error {
 	// address perform a deployment by starting a proxy DNS server
 	// and shutting down the old discoverd job
 	var deploy *dd.Deployment
-	var lastIdx uint64
+	var shutdownInfo dt.ShutdownInfo
 
 	target := fmt.Sprintf("http://%s:1111", opt.Host)
 	m.logger.Println("Trying to connect to:", target)
@@ -128,7 +129,7 @@ func (m *Main) Run(args ...string) error {
 		}
 		m.logger.Printf("discoverd listening for DNS on %s", addr)
 
-		lastIdx, err = discoverd.NewClientWithURL(target).Shutdown()
+		shutdownInfo, err = discoverd.NewClientWithURL(target).Shutdown()
 		if err != nil {
 			return err
 		}
@@ -147,9 +148,9 @@ func (m *Main) Run(args ...string) error {
 	}
 
 	// Wait for the store to catchup before switching to local store if we are doing a deployment
-	if m.store != nil && lastIdx > 0 {
-		for m.store.LastIndex() < lastIdx {
-			m.logger.Println("Waiting for store to catchup, current:", m.store.LastIndex(), "target:", lastIdx)
+	if m.store != nil && shutdownInfo.LastIndex > 0 {
+		for m.store.LastIndex() < shutdownInfo.LastIndex {
+			m.logger.Println("Waiting for store to catchup, current:", m.store.LastIndex(), "target:", shutdownInfo.LastIndex)
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
@@ -235,7 +236,7 @@ func waitHostDNSConfig() (addr string, resolvers []string) {
 }
 
 // Close shuts down all open servers.
-func (m *Main) Close() (lastIdx uint64, err error) {
+func (m *Main) Close() (info dt.ShutdownInfo, err error) {
 	if m.httpServer != nil {
 		// Disable keep alives so that persistent connections will close
 		m.httpServer.SetKeepAlivesEnabled(false)
@@ -248,11 +249,13 @@ func (m *Main) Close() (lastIdx uint64, err error) {
 		m.dnsServer.Close()
 		m.dnsServer = nil
 	}
+	var lastIdx uint64
 	if m.store != nil {
 		lastIdx, err = m.store.Close()
 		m.store = nil
 	}
-	return lastIdx, err
+	info.LastIndex = lastIdx
+	return info, err
 }
 
 // openStore initializes and opens the store.

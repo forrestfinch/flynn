@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	dt "github.com/flynn/flynn/discoverd/types"
 	"github.com/flynn/flynn/pkg/dialer"
 	"github.com/flynn/flynn/pkg/httpclient"
 	hh "github.com/flynn/flynn/pkg/httphelper"
@@ -165,8 +166,7 @@ outer:
 	}
 }
 
-func (c *Client) Shutdown() (uint64, error) {
-	var res uint64
+func (c *Client) Shutdown() (res dt.ShutdownInfo, err error) {
 	return res, c.c.Post("/shutdown", nil, &res)
 }
 

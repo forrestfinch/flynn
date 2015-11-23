@@ -10,6 +10,7 @@ import (
 
 	"github.com/flynn/flynn/Godeps/_workspace/src/github.com/julienschmidt/httprouter"
 	"github.com/flynn/flynn/discoverd/client"
+	dt "github.com/flynn/flynn/discoverd/types"
 	hh "github.com/flynn/flynn/pkg/httphelper"
 	"github.com/flynn/flynn/pkg/sse"
 	"github.com/flynn/flynn/pkg/status"
@@ -59,7 +60,7 @@ func NewHandler() *Handler {
 type Handler struct {
 	http.Handler
 	Main interface {
-		Close() (uint64, error)
+		Close() (dt.ShutdownInfo, error)
 	}
 	Store interface {
 		Leader() string
