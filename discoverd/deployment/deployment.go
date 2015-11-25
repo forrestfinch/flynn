@@ -36,13 +36,11 @@ type Deployment struct {
 	stream  stream.Stream
 }
 
-const deploymentTimeout = time.Minute
-
 // MarkPerforming marks the given address as performing in the service metadata,
 // ensuring there is only one address marked as performing at any given time
 // (waiting for a ServiceMeta event and retrying if there is already an
 // address performing).
-func (d *Deployment) MarkPerforming(addr string) error {
+func (d *Deployment) MarkPerforming(addr string, timeout int) error {
 outer:
 	for {
 		meta, err := d.service.GetMeta()
@@ -80,7 +78,7 @@ outer:
 					if event.Kind == discoverd.EventKindServiceMeta {
 						continue outer
 					}
-				case <-time.After(deploymentTimeout):
+				case <-time.After(time.Duration(timeout) * time.Second):
 					return fmt.Errorf("timed out waiting for %s to finish performing", performing)
 				}
 			}
@@ -127,7 +125,7 @@ func (d *Deployment) MarkDone(addr string) error {
 }
 
 // Wait waits for an expected number of "done" addresses in the service metadata
-func (d *Deployment) Wait(expected int, log log15.Logger) error {
+func (d *Deployment) Wait(expected int, timeout int, log log15.Logger) error {
 	for {
 		actual := 0
 		select {
@@ -151,7 +149,7 @@ func (d *Deployment) Wait(expected int, log log15.Logger) error {
 					return nil
 				}
 			}
-		case <-time.After(deploymentTimeout):
+		case <-time.After(time.Duration(timeout) * time.Second):
 			return fmt.Errorf("timed out waiting for discoverd deployment (expected=%d actual=%d)", expected, actual)
 		}
 	}

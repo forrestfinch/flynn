@@ -45,7 +45,7 @@ loop:
 				t.Fatal("the deployment failed")
 			}
 			debugf(t, "got deployment event: %s %s", event.JobType, event.JobState)
-		case <-time.After(2 * time.Minute):
+		case <-time.After(time.Duration(app.DeployTimeout) * time.Second):
 			t.Fatal("timed out waiting for deployment event")
 		}
 	}

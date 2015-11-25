@@ -112,7 +112,7 @@ func (m *Main) Run(args ...string) error {
 			return err
 		}
 		m.logger.Println("Created deployment")
-		if err := deploy.MarkPerforming(advertiseAddr); err != nil {
+		if err := deploy.MarkPerforming(advertiseAddr, 60); err != nil {
 			return err
 		}
 		m.logger.Println("Marked", advertiseAddr, "as performing")
