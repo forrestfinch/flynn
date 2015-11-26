@@ -98,9 +98,9 @@ func (m *Main) Run(args ...string) error {
 	var shutdownInfo dt.ShutdownInfo
 
 	target := fmt.Sprintf("http://%s:1111", opt.Host)
-	m.logger.Println("Trying to connect to:", target)
+	m.logger.Println("checking for existing discoverd process at", target)
 	if err := discoverd.NewClientWithHTTP(target, &http.Client{}).Ping(); err == nil {
-		m.logger.Println("Server responding at", target, "taking over")
+		m.logger.Println("discoverd responding at", target, "taking over")
 
 		// update DISCOVERD environment variable so that the default
 		// discoverd client connects to the instance we intend to replace.
@@ -111,11 +111,10 @@ func (m *Main) Run(args ...string) error {
 		if err != nil {
 			return err
 		}
-		m.logger.Println("Created deployment")
 		if err := deploy.MarkPerforming(advertiseAddr, 60); err != nil {
 			return err
 		}
-		m.logger.Println("Marked", advertiseAddr, "as performing")
+		m.logger.Println("marked", advertiseAddr, "as performing in deployent")
 		addr, resolvers := waitHostDNSConfig()
 		if opt.DNSAddr != "" {
 			addr = opt.DNSAddr
@@ -123,7 +122,7 @@ func (m *Main) Run(args ...string) error {
 		if len(opt.Recursors) > 0 {
 			resolvers = opt.Recursors
 		}
-		m.logger.Println("Starting proxy DNS server")
+		m.logger.Println("starting proxy DNS server")
 		if err := m.openDNSServer(addr, resolvers, httpPeers); err != nil {
 			return fmt.Errorf("Failed to start DNS server: %s", err)
 		}
@@ -134,7 +133,7 @@ func (m *Main) Run(args ...string) error {
 			return err
 		}
 	} else {
-		m.logger.Println("Failed to contact existing discoverd server, starting up without takeover")
+		m.logger.Println("failed to contact existing discoverd server, starting up without takeover")
 	}
 
 	// Open store if we are not proxying.
@@ -193,6 +192,7 @@ func (m *Main) Run(args ...string) error {
 		if err := deploy.MarkDone(advertiseAddr); err != nil {
 			return err
 		}
+		m.logger.Println("marked", advertiseAddr, "as done in deployment")
 	}
 
 	// Notify user that the servers are listening.
@@ -249,12 +249,10 @@ func (m *Main) Close() (info dt.ShutdownInfo, err error) {
 		m.dnsServer.Close()
 		m.dnsServer = nil
 	}
-	var lastIdx uint64
 	if m.store != nil {
-		lastIdx, err = m.store.Close()
+		info.LastIndex, err = m.store.Close()
 		m.store = nil
 	}
-	info.LastIndex = lastIdx
 	return info, err
 }
 
